@@ -23,7 +23,7 @@ class Job(Base):
     status: Mapped[JobStatus] = mapped_column(default=JobStatus.queued)
     result: Mapped[Optional[str]] = mapped_column(default=None)
     error: Mapped[Optional[str]] = mapped_column(default=None)
-    created_at: Mapped[datetime] = mapped_column(default=func.now())
+    created_at: Mapped[datetime] = mapped_column(default=func.now(), index=True)
     started_at: Mapped[Optional[datetime]] = mapped_column(default=None)
     completed_at: Mapped[Optional[datetime]] = mapped_column(default=None)
 
