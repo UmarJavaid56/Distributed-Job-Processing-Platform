@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from app.config import settings
 from app.database import get_db, Base, engine
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.models.job import Job
 from app.routes.jobs import router as job_router
+from app.redis import redis_client
 
 app = FastAPI(title=settings.app_name)
 app.include_router(job_router)
@@ -18,6 +19,16 @@ def get_tasks(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT 1")).scalar()
     return {"message": result}
 
+@app.get("/redis-health")
+def redis_health_check():
+    if redis_client.ping():
+        return {"redis": "ok"}
+    else:
+        raise HTTPException(
+            status_code=503, 
+            detail="Redis service is unavailable"
+    )
+    
 def _init_db():
     Base.metadata.create_all(bind=engine)
 

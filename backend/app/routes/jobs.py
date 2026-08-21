@@ -5,10 +5,15 @@ from fastapi import Depends, APIRouter, HTTPException, status, Query
 from app.models.job import Job, JobStatus
 from sqlalchemy import select
 from datetime import datetime, timezone
+from app.redis import redis_client
 import uuid
 
+QUEUE_KEY = "job_queue"
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+
+def enqueue_job(job_id: uuid.UUID) -> None:
+    redis_client.lpush(QUEUE_KEY, str(job_id))
 
 @router.post("", status_code=201, response_model=JobRead)
 def create_job(body: JobCreate, db: Session = Depends(get_db)) -> JobRead:
@@ -16,6 +21,7 @@ def create_job(body: JobCreate, db: Session = Depends(get_db)) -> JobRead:
     db.add(job)
     db.commit()
     db.refresh(job)
+    enqueue_job(job.id)
     return job
 
 @router.get("", response_model=list[JobRead])
