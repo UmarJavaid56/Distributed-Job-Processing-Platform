@@ -5,7 +5,7 @@ from fastapi import Depends, APIRouter, HTTPException, status, Query
 from app.models.job import Job, JobStatus
 from sqlalchemy import select
 from datetime import datetime, timezone
-from app.redis import redis_client
+from app.redis import redis_client, get_cached_job, set_cached_job, invalidated_job_cache
 import uuid
 
 QUEUE_KEY = "job_queue"
@@ -41,12 +41,17 @@ def list_jobs(
 
 @router.get("/{job_id}", response_model=JobRead)
 def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobRead:
+    cached = get_cached_job(job_id)
+    if cached is not None:
+        return cached
+    
     job = db.get(Job, job_id)
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job with ID {job_id} not found"
         )
+    set_cached_job(job)
     return job
 
 @router.delete("/{job_id}", response_model=JobRead)
@@ -66,5 +71,6 @@ def cancel_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobRead:
     job.status = JobStatus.cancelled
     job.completed_at = datetime.now(timezone.utc)
     db.commit()
+    invalidated_job_cache(job.id)
     db.refresh(job)
     return job

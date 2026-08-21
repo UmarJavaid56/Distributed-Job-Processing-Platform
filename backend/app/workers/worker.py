@@ -1,6 +1,6 @@
 from app.database import session_Local
 from app.models.job import Job, JobStatus
-from app.redis import redis_client
+from app.redis import redis_client, invalidated_job_cache
 from app.routes.jobs import QUEUE_KEY
 
 from datetime import datetime, timezone
@@ -33,6 +33,7 @@ def run_worker():
             job.status = JobStatus.running
             job.started_at = datetime.now(timezone.utc)
             db.commit()
+            invalidated_job_cache(job.id)
             print("running", job.id)
 
 
@@ -43,12 +44,14 @@ def run_worker():
                 job.status = JobStatus.completed
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()    
+                invalidated_job_cache(job.id)
                 print("completed", job.id)
             except Exception as e:
                 job.status = JobStatus.failed
                 job.error = str(e)
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
+                invalidated_job_cache(job.id)
                 print("failed", job.id, e)
 
         finally:
