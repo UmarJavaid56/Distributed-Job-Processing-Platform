@@ -1,8 +1,6 @@
 # TaskFlow
 
-A distributed job processing platform: submit computational jobs from a web dashboard, track status, and view results.
-
-Built as a portfolio project to practice backend architecture, background workers, Redis, and full-stack integration — with a stack small enough to understand completely and explain in interviews.
+A distributed job processing platform that submits computational jobs from a web dashboard, tracks status, and views results.
 
 ## Architecture
 
@@ -26,7 +24,7 @@ React (TypeScript)
 ```
 
 - The **frontend** never talks to PostgreSQL or Redis — only to the REST API.
-- The **API** validates requests, writes jobs to Postgres, enqueues job IDs in Redis, and serves reads (with an optional status cache).
+- The **API** validates requests, writes jobs to Postgres, enqueues job IDs in Redis, and serves reads with a status cache.
 - The **worker** is a separate process: it pops IDs from Redis, loads jobs from Postgres, runs the work, and updates status/results.
 
 ### Job state machine
@@ -50,7 +48,7 @@ Invalid transitions are rejected (e.g. cancelling a completed job returns **409 
 | Worker | Python process (`BRPOP` + DB updates) |
 | Frontend | React, TypeScript, Vite |
 | Infra | Docker, Docker Compose |
-| Tests | pytest (planned / add as you go) |
+| Tests | pytest |
 
 ## Features
 
@@ -173,12 +171,18 @@ docker compose down
 
 ## Running tests
 
+From `backend/` (with the virtualenv activated):
+
 ```bash
-cd backend
+pip install -r requirements.txt
 pytest
 ```
 
-Add tests under `backend/tests/` for job creation, validation, retrieval, cancellation, and worker behavior. Prefer meaningful cases over chasing 100% coverage.
+Tests use an in-memory SQLite database and mock Redis enqueue/cache calls, so Docker does not need to be running for the API suite.
+
+```bash
+pytest -v
+pytest tests/test_jobs.py::test_create_job
 
 ## Project structure
 
@@ -210,14 +214,14 @@ taskflow/
 
 ### Why PostgreSQL?
 
-Jobs need durable history: status, results, errors, and timestamps must survive restarts. Listing and filtering by `created_at` fit a relational model. Postgres is the **source of truth**; if Redis or a worker dies, job rows remain queryable.
+Jobs need durable history, as status, results, errors, and timestamps must survive restarts. Listing and filtering by `created_at` fit a relational model. Postgres is the **source of truth** so if Redis or a worker dies, job rows remain queryable.
 
 ### Why Redis?
 
 Two roles, both ephemeral/fast:
 
 1. **Queue** — `job_queue` holds pending job IDs (`LPUSH` on create, `BRPOP` in the worker). The API returns immediately without waiting for compute.
-2. **Status cache** — `job_status:{id}` speeds repeated `GET /api/jobs/{id}` with a short TTL; invalidated when status changes.
+2. **Status cache** — `job_status:{id}` speeds up repeated `GET /api/jobs/{id}` with a short TTL, which is invalidated when status changes.
 
 Redis is not used as the system of record. If Redis is empty, jobs still exist in Postgres (orphaned `queued` rows can be re-enqueued or skipped by policy).
 
@@ -240,6 +244,3 @@ Identical environments for Postgres, Redis, API, worker, and frontend. `docker c
 3. **Cancel** — only from `queued` → `cancelled` (409 otherwise). The worker skips non-queued IDs if they were already cancelled after enqueue.
 4. **Cache** — GET may serve Redis; writes invalidate `job_status:{id}` so clients don’t see stale status.
 
-## License
-
-Personal / portfolio project — use and adapt as you like.
