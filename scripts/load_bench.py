@@ -122,7 +122,6 @@ def main() -> int:
     }
     print(json.dumps(report, indent=2))
 
-    # Resume-friendly one-liner
     print(
         f"\nRESULT: {len(job_ids)} jobs, ~{args.workers_hint} concurrent workers, "
         f"{success_pct:.1f}% completed successfully in {wait_s:.1f}s"
