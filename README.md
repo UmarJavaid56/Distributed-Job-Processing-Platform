@@ -171,12 +171,18 @@ docker compose down
 
 ## Running tests
 
+From `backend/` (with the virtualenv activated):
+
 ```bash
-cd backend
+pip install -r requirements.txt
 pytest
 ```
 
-Tests under `backend/tests/` for job creation, validation, retrieval, cancellation, and worker behavior.
+Tests use an in-memory SQLite database and mock Redis enqueue/cache calls, so Docker does not need to be running for the API suite.
+
+```bash
+pytest -v
+pytest tests/test_jobs.py::test_create_job
 
 ## Project structure
 
