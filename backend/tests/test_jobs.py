@@ -98,3 +98,46 @@ def test_cancel_non_queued_job_conflict(client, db_session):
 def test_cancel_missing_job(client):
     response = client.delete(f"/api/jobs/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+def test_get_job_cache_hit(client, monkeypatch):
+    from app.schemas.job import JobRead
+
+    created = client.post(
+        "/api/jobs",
+        json={"name": "from-cache", "payload": {"seconds": 1}},
+    ).json()
+
+    monkeypatch.setattr(
+        "app.routes.jobs.get_cached_job",
+        lambda _job_id: JobRead.model_validate(created),
+    )
+
+    response = client.get(f"/api/jobs/{created['id']}")
+    assert response.status_code == 200
+    assert response.json()["name"] == "from-cache"
+
+
+def test_list_jobs_empty(client):
+    response = client.get("/api/jobs")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_redis_health(client, monkeypatch):
+    monkeypatch.setattr("app.main.redis_client.ping", lambda: True)
+    response = client.get("/redis-health")
+    assert response.status_code == 200
+    assert response.json() == {"redis": "ok"}
+
+
+def test_redis_health_unavailable(client, monkeypatch):
+    monkeypatch.setattr("app.main.redis_client.ping", lambda: False)
+    response = client.get("/redis-health")
+    assert response.status_code == 503
+
+
+def test_items_db_probe(client):
+    response = client.get("/items")
+    assert response.status_code == 200
+    assert "message" in response.json()
