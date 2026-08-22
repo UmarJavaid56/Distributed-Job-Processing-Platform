@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import get_db, Base, engine
 from sqlalchemy.orm import Session
@@ -9,6 +10,15 @@ from app.redis import redis_client
 
 app = FastAPI(title=settings.app_name)
 app.include_router(job_router)
+
+origins = ["http://localhost:5173"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = origins,
+    allow_credentials = True,
+    allow_methods = ["*"],
+    allow_headers = ["*"],
+)
 
 @app.get("/health")
 async def health_check():
