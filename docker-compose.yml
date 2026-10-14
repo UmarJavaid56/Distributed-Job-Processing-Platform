@@ -13,6 +13,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   redis:
     image: redis:7-alpine
@@ -20,9 +25,15 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   backend:
     build: ./backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -30,30 +41,43 @@ services:
       DATABASE_URL: postgresql+psycopg://taskflow:taskflow@db:5432/taskflow
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   worker:
     build: ./backend
     command: ["python", "-m", "app.workers.worker"]
+    restart: unless-stopped
     environment:
       APP_NAME: TaskFlow
       DATABASE_URL: postgresql+psycopg://taskflow:taskflow@db:5432/taskflow
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - db
-      - redis
-      - backend
+      # Waits for the API because the API creates the database tables on startup.
+      backend:
+        condition: service_healthy
+    # Scale for concurrent processing, e.g.:
+    #   docker compose up --build --scale worker=5
+    # Each replica handles one job at a time via BRPOP.
 
   frontend:
     build:
       context: ./frontend
       args:
         VITE_API_URL: http://localhost:8000
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   db_data:

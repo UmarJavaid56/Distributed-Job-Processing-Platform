@@ -2,6 +2,34 @@
 
 A distributed job processing platform that submits computational jobs from a web dashboard, tracks status, and views results.
 
+## Quick start
+
+The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running). One command starts everything: Postgres, Redis, the API, the worker, and the dashboard.
+
+```bash
+git clone https://github.com/UmarJavaid56/Distributed-Job-Processing-Platform.git
+cd Distributed-Job-Processing-Platform
+docker compose up --build
+```
+
+When the logs settle, open:
+
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:3000 |
+| API / Swagger | http://localhost:8000/docs |
+| Health | http://localhost:8000/health |
+
+Services start in order: the API waits for Postgres and Redis to pass healthchecks, and the worker and dashboard wait for the API.
+
+Run more workers for concurrent processing:
+
+```bash
+docker compose up --build --scale worker=5
+```
+
+Stop everything with `docker compose down` (add `-v` to also delete the database).
+
 ## Architecture
 
 ```text
@@ -86,18 +114,19 @@ curl -X POST http://localhost:8000/api/jobs \
 curl http://localhost:8000/api/jobs/<job-id>
 ```
 
-## Local setup (development)
+## Development setup (optional)
+
+You don't need this to run the project; use the [Quick start](#quick-start). This setup runs the API, worker, and frontend outside Docker so code changes reload instantly while you edit.
 
 ### Prerequisites
 
 - Python 3.12+
 - Node.js 20+ (npm)
-- Docker Desktop (for Postgres + Redis, or the full stack)
+- Docker Desktop (for Postgres and Redis)
 
 ### 1. Start Postgres and Redis
 
 ```bash
-cd taskflow
 docker compose up -d db redis
 ```
 
@@ -146,28 +175,9 @@ npm run dev
 
 Open http://localhost:5173 — the Vite app calls the API at `http://127.0.0.1:8000` by default.
 
-## Docker setup (full stack)
+Don't run this alongside the full Compose stack: both use ports 8000, 5432, and 6379.
 
-One command runs API, worker, frontend, Postgres, and Redis:
-
-```bash
-cd taskflow
-docker compose up --build
-```
-
-| Service | URL |
-|---------|-----|
-| Dashboard | http://localhost:3000 |
-| API / Swagger | http://localhost:8000/docs |
-| Health | http://localhost:8000/health |
-
-Inside Compose, the API and worker reach Postgres/Redis by service name (`db`, `redis`). The browser still calls `http://localhost:8000` (see `VITE_API_URL` build arg).
-
-Stop:
-
-```bash
-docker compose down
-```
+Inside Compose, the API and worker reach Postgres/Redis by service name (`db`, `redis`) instead of `localhost`. The browser still calls `http://localhost:8000` (see the `VITE_API_URL` build arg).
 
 ## Running tests
 
