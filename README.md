@@ -51,7 +51,7 @@ React (TypeScript)
                    PostgreSQL
 ```
 
-- The **frontend** never talks to PostgreSQL or Redis — only to the REST API.
+- The **frontend** communicates with the REST API.
 - The **API** validates requests, writes jobs to Postgres, enqueues job IDs in Redis, and serves reads with a status cache.
 - The **worker** is a separate process: it pops IDs from Redis, loads jobs from Postgres, runs the work, and updates status/results.
 
@@ -173,9 +173,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — the Vite app calls the API at `http://127.0.0.1:8000` by default.
+Open http://localhost:5173. The Vite app calls the API at `http://127.0.0.1:8000` by default.
 
-Don't run this alongside the full Compose stack: both use ports 8000, 5432, and 6379.
+Don't run this alongside the full Compose stack, as both use ports 8000, 5432, and 6379.
 
 Inside Compose, the API and worker reach Postgres/Redis by service name (`db`, `redis`) instead of `localhost`. The browser still calls `http://localhost:8000` (see the `VITE_API_URL` build arg).
 
