@@ -230,38 +230,3 @@ taskflow/
 ├── docker-compose.yml
 └── README.md
 ```
-
-## Design Decisions
-
-### Why PostgreSQL?
-
-Jobs need durable history, as status, results, errors, and timestamps must survive restarts. Listing and filtering by `created_at` fit a relational model. Postgres is the **source of truth** so if Redis or a worker dies, job rows remain queryable.
-
-### Why Redis?
-
-Two roles, both ephemeral/fast:
-
-1. **Queue** — `job_queue` holds pending job IDs (`LPUSH` on create, `BRPOP` in the worker). The API returns immediately without waiting for compute.
-2. **Status cache** — `job_status:{id}` speeds up repeated `GET /api/jobs/{id}` with a short TTL, which is invalidated when status changes.
-
-Redis is not used as the system of record. If Redis is empty, jobs still exist in Postgres (orphaned `queued` rows can be re-enqueued or skipped by policy).
-
-### Why asynchronous workers?
-
-Compute (even simulated sleep) must not block HTTP handlers. A separate worker process scales independently from the API, crashes without taking down request serving, and matches how real job systems separate “accept work” from “do work.”
-
-### Why REST?
-
-Simple to debug with curl/Swagger, easy for the React client, and enough for create/list/get/cancel. Polling covers live status for a dashboard without WebSockets or extra infrastructure.
-
-### Why Docker?
-
-Identical environments for Postgres, Redis, API, worker, and frontend. `docker compose up --build` demos the whole system without manual service installs. Compose keeps the project understandable — no Kubernetes.
-
-### How job state transitions work?
-
-1. **Create** — insert row as `queued`, push ID to Redis, return 201.
-2. **Worker** — pop ID; if still `queued`, set `running` + `started_at`; run work; set `completed` + `result` or `failed` + `error`.
-3. **Cancel** — only from `queued` → `cancelled` (409 otherwise). The worker skips non-queued IDs if they were already cancelled after enqueue.
-4. **Cache** — GET may serve Redis; writes invalidate `job_status:{id}` so clients don’t see stale status.
-
